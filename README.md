@@ -1,0 +1,271 @@
+Hubris is programming language, consisting of a very thin layer atop 65C02 assembly language. It is designed to target the (fictional) Eiling Technologies ARS, but can probably be coerced into targeting any sane 65C02 system. It uses the excellent WLA-DX assembler and linker as the backend.
+
+# Goals
+
+Hubris has three major goals:
+
+- Efficiently allocating local variables, parameters, etc. in a full-system program
+- Improving the safety and efficiency of subroutine calls
+- Reducing programmer workload for bank-switching
+
+# Installation
+
+`hcc.lua` is **NOT** the Hubris compiler. It is the Hubris compiler *compiler*. It is used to assemble `hubris.lua` from the components in `src`.
+
+Install Lua 5.3, LuaFileSystem, and LPEG. The latter two can be installed with LuaRocks:
+
+    luarocks install luafilesystem
+    luarocks install lpeg
+
+On UNIX, you may want to put a symlink to `hubris.lua` somewhere in your PATH.
+
+# Usage
+
+When you run the Hubris compiler, you provide it one or more source directories. The Hubris compiler recursively searches these directories and processes all `.65c` and `.hu` files it finds. `.hu` files are Hubris-language source files, and are fully processed. `.65c` files are raw 65C02 source files, and are passed on to the assembler with no further processing. (`.65c` files contain startup code, certain kinds of glue, and pure data.)
+
+There is no file dependency or order dependency in `.hu` files. `#routine`s must each be fully contained inside one file, but other than that, the final compiled code is the same as if all `.hu` files are concatentated together before compiling.
+
+Hubris puts all its intermediate files, and `.o` files, into the output directory provided. By convention, this directory is named `obj`. There will be two files of interest in this directory:
+
+- `memorymap`: Should be included by every `.65c` file. Contains Hubris's beliefs about the memory map of the machine, and `.DEFINE` directives for the assignments of the `#group`s and `#slot`s.
+- `link`: Pass this to `wlalink` to link the program as known by Hubris. If you want to add object files, headers, etc. then you should edit this file after running the Hubris compiler.
+
+`.hu` files mainly contain Routines. A Routine is a block of code, and has its own scope for local variables and parameters. Recursion, directly or indirectly, is normally not allowed.
+
+Entry Points are a special kind of routine. Entry Points are not called from other Routines. Instead, they are jumped into via interrupt vectors, or called from special assembly glue code. An Entry Point, along with every Routine called directly or indirectly by that Entry Point, forms a Subprogram. Routines from one Subprogram cannot call routines from another.
+
+Subprograms separate routines that must be able to interrupt one another safely. A typical ARS game will have three or four Entry Points, and therefore three or four Subprograms:
+
+- `IRQ` will contain some very slim graphics code that does scanline effects.
+- `BRK` will contain a short routine to gracefully halt execution if a `BRK` is encountered. (If using the standard ET init code, this isn't needed.)
+- `NMI` will contain code to do per-frame PPU updates, and audio code.
+- `Main` will contain the vast bulk of the program, including all game logic.
+
+Hubris does not assign any special meaning to any particular entry point name. You are free to define as many or as few as you like, with whatever names you like. You *must* define at least one, however; Routines that are not called from any Entry Point are not assembled, and therefore not included in the final program.
+
+# Syntax
+
+Hubris source files use `;` as a comment character, just like regular 65C02 assembly files. Each non-blank line is either:
+
+- A Hubris directive, beginning with `#`
+- A line of 65C02 assembly, or WLA-DX directive (only allowed within a `#routine`)
+
+## Include
+
+    #include "path/to/file.inc"
+
+Use `#include` instead of `.INCLUDE`. Each source directory is searched in the order given on the command line. Please, please do not use a `.hu` extension for files meant to be included by other files. And please, regardless of what operating system you run Hubris on, please use `/` as a path component separator.
+
+Hubris's variable and routine systems are relatively smart, so `#include` is mainly only needed for incorporating automatically-generated data files.
+
+## Memory directives
+
+Every Hubris program must contain, somewhere in its source, a `#bs` directive, a `#bankcount` directive, and preferably at least one `#region` directive.
+
+    #bs <BS>
+
+Informs Hubris of the hardwired BSx pin values for this cartridge. In the name of sanity, Hubris uses this information to determine both the slot count and the slot size. `<BS>`=0 means 1x32KiB slot, 1 means 2x16KiB slots, 2 means 4x8KiB slots, and 3 means 8x4KiB slots.
+
+    #bankcount <count>
+
+Informs Hubris of the number of ROM banks available for use. This must be a power of two.
+
+    #region <first> <last> <name>
+
+Informs Hubris of a region of memory that can contain variables. An ARS program will almost always have:
+
+    #region $0000 $00FF fast
+    #region $0250 $7FFF slow
+
+Variables with hardcoded addresses may exist outside of these regions. In fact, if you hardcode every address, you don't need `#region` at all. (But then you've lost out on half the point of using Hubris...)
+
+## Banks and Slots
+
+If you are making a one-bank ROM, you can ignore this section.
+
+WLA-DX has support for multiple banks and slots that is normally quite adequate. However, Hubris generates each `#routine` in a separate WLA `.SECTION`, and WLA-DX does *not* have support for ensuring that multiple `.SECTION`s will end up in the same bank. Since WLA-DX decides banks at link time, it also can not provide a way to optimize out longcalls and such. For these reasons, Hubris requires manual bank assignment. It has some features intended to make this a little easier.
+
+    #group <n> <slot> <name>
+
+Defines a group with the given name. A group is a logical collection of related routines and data that should always be mapped at the same time. Multiple groups may coexist in the same ROM bank, even if they occupy different slots. `n` is the 0-based index of the ROM bank this group will reside in. `slot` is the 0-based index *or* `#slot` name of the *slot* this group will occupy. Example:
+
+    #group 0 VectorSlot InterruptCode
+    #group 0 0 StartupCode
+
+Creates a group named `InterruptCode` which will occupy the `VectorSlot` slot, and another group named `StartupCode` which will occupy the lowest slot. Both groups, despite potentially occupying different slots, will coexist in the same ROM bank of the cartridge. (If this cartridge has `#bs 1` and `#slot 1 VectorSlot`, then `InterruptCode` will link to `$C000` and on, while `StartupCode` will link to `$8000` and on.)
+
+    #slot <n> <name>
+
+Defines a slot alias. It is not an error to have multiple different aliases for the same slot, but it is an error to have multiple aliases with the same name.
+
+### Special Symbols
+
+Hubris defines the following special symbols in the memory map file:
+
+    hubris_Group_<name>_bank
+
+The ROM bank number assigned to the given group.
+
+    hubris_Group_<name>_slot
+
+The slot number used by the given group.
+
+    hubris_Slot_<name>_slot
+
+The slot number for the given slot alias.
+
+## Routines
+
+    #routine <name> <...>
+    ; assembly, such as look-up tables and "backward jumps", may go here
+    #begin
+    ; execution of the routine begins at this point
+    #return
+    ; more optional assembly, including possible "forward jumps"
+    #endroutine
+
+This is the structure of a Routine. Between `#routine` and `#endroutine` is the only place assembly lines are allowed. When someone does `#call <name>` (or glue assembly does `JSR <name>`/`JMP <name>`), execution begins at the location specified by `#begin`. `#return` is the equivalent of `RTS`. `#return INTERRUPT` will do `RTI` instead of `RTS`.
+
+Routine names may not begin with `_`, but may otherwise be any valid identifier. A Routine name may also consist of arbitrarily many names separated by double colons (`::`), in which case this is a Subroutine. For example, `X::Y` is a subroutine of `X`. It has access to `#param` and `#sublocal` variables of `X`, and can only be called from `X` and other subroutines of `X`. Hubris exports a symbol whose name is the exact routine name, including any colons.
+
+Every line within a `#routine` that is not a Hubris directive is passed to the assembler. They can contain instructions, labels, even WLA-DX directives. (Some WLA-DX directives, such as `.SECTION`/`.ENDS`, are inadvisable within a `#routine`.) Any labels defined within a `#routine` *should* begin with an underscore or be a +/- label.
+
+There may be more than one `#return`, in case the routine has multiple termination points. There may even be no `#return`, in case the routine is a deliberate infinite loop or otherwise never terminates, in which event `#endroutine` must be replaced with `#endroutine NORETURN` to indicate that this is intended.
+
+Extra parameters to `#routine`:
+
+- `ENTRY`  
+  Marks this routine as an Entry Point. (Generally there will be very few of these in a program.)
+- `CLOBBER <regs>`/`PRESERVE <regs>`
+  `<regs>` is a list of registers, containing any of `A`, `X`, `Y`. `CLOBBER` indicates that this routine intentionally clobbers these registers. `PRESERVE` indicates that this routine should push these registers on entry and pop them on `#return` or `#call ... JUMP`. (Hubris then adds the necessary pushes and pops automatically.) If a register is not listed as either `CLOBBER` or `PRESERVE`, it is assumed that this routine **does not alter** the register, either because it doesn't use it or because it has its own internal preservation logic.
+- `ORGA <value>`  
+  Forces this routine to start at the given CPU address. (This applies to the first line of the routine, not necessarily to its `#begin`!) WLA will complain if the address is outside the relevant slot.
+- `GROUP <name>`  
+  This specifies which group the routine belongs to. Related routines should be put into the same group. It is an error to leave off the `GROUP` parameter for an `ENTRY` routine if multiple banks are available. (Non-`ENTRY` routines default to inheriting the `GROUP` of their nearest parent routine.)
+
+## Calls
+
+    #call <name> <...>
+
+Calls a routine with the given name. This should be used instead of `JSR`/`JMP`, since otherwise Hubris won't know about the call, and won't be able to check / ensure register preservation.
+
+Extra parameters to `#call`:
+
+- `CLOBBER <regs>`/`PRESERVE <regs>`
+  `<regs>` is a list of registers, containing any of `A`, `X`, `Y`. `CLOBBER` indicates that you don't care if the listed registers are clobbered, which is the default state. `PRESERVE` indicates that you want the listed registers to be preserved. (Hubris will automatically add pushes and pops to ensure this, if and *only* if it is necessary.)
+- `JUMP`  
+  Use `JMP` instead of `JSR` to call this routine. Saves a few cycles for explicit tail returns, and is the only condoned way of doing recursion. (`CLOBBER` and `PRESERVE` are meaningless and ignored with a `JUMP` call; registers are restored according to the calling routine's `PRESERVE` tags instead.)
+- `INTER`  
+  This `#call` is intended for a different group. This tag *must* be present on calls across group boundaries, and *must not* be present on calls within the same group. Intergroup calls may incur a Longcall, see below.  
+  Longcalls will clobber the accumulator; with the `-i` option, the compiler will clobber the accumulator on *all* `INTER` calls, even non-long ones; this helps head off accumulator-related accidents when groups are shuffled around.
+- `UNSAFE`  
+  Don't use this! This ignores the call for recursion checking, cross-subprogram call prevention, and variable allocation! This allows you to bypass all of Hubris's safety checks! Before you do something like this, consider not doing the unsafe thing in the first place!
+
+If you have a routine named `foo` and a parameter named `p_Bar`, you can access it within any routine that directly calls `foo` by writing `foo::p_Bar`. You should write any parameters immediately before the call, and read any return values immediately afterward.
+
+### Longcall
+
+When calling between groups that occupy the *same slot*, but *different ROM banks*, a Longcall is required. Hubris generates the following code:
+
+            LDA #<TARGET
+            STA ENTRY::glue_longcallSLOT::target
+            LDA #>TARGET
+            STA ENTRY::glue_longcallSLOT::target+1
+            LDA #BANK
+            STA ENTRY::glue_longcallSLOT::target_bank
+            JSR ENTRY::glue_longcallSLOT
+
+where TARGET, BANK, and SLOT are the target routine and the ROM bank and slot occupied by the target routine, and ENTRY is the entry point in effect.
+
+You must implement your own `glue_longcallSLOT` routines according to your own use of slots. For example, if your code follows the convention that slot 0 contains all main routines, and `FixedUtilGroup` is in another slot is always mapped, you might provide:
+
+    #routine Main::glue_longcall0 GROUP FixedUtilGroup CLOBBER Y
+    #param fast PTR target
+    #param fast BYTE target_bank
+    #begin
+            ; Save the current slot 0 mapping
+            LDA r_BankSelect
+            PHA
+            ; Push the return address, as if by JSR
+            LDA #<_tail
+            PHA
+            LDA #>_tail
+            PHA
+            ; Activate the target bank in slot 0
+            LDA target_bank
+            STA r_BankSelect
+            ; Indirect JMP! (There is no indirect JSR, so we explicitly pushed
+            ; the return address and did this instead.)
+            JMP (target)
+            ; restore slot 0 mapping, clobbering Y rather than A
+            ; (According to our program's convention, A may contain a return
+            ; value, while Y may not. Therefore, we clobber Y here.)
+    _tail:  PLY
+            STY r_BankSelect
+    #return
+    #endroutine
+
+As you can see, long calls will have a significant amount of overhead compared to regular ones. This is why you should keep related code in the same bank, if not the same `GROUP`, whenever possible.
+
+(The call to the `longcall` glue bypasses recursion checks and certain other housekeeping, so you must be careful what you write inside. For one thing, you should only provide `#params`. If you are having trouble understanding these principles, you should consider just using the above code verbatim.)
+
+## Variables
+
+A variable declaration looks like:
+
+    #<type> <location> <size> <name> <...>
+
+There are four types of variable in Hubris:
+
+- `#global`: Not scoped, and potentially shared between subprograms. Also used, with hardcoded addresses, to denote hardware registers.
+- `#local`: Accessible only from the active scope.
+- `#sublocal`: Accessible from the active scope and from the scopes of Subroutines of the active `#routine`. (All Routines are, at least, Subroutines of their Entry Point.)
+- `#param`: Accessible from the active scope, and the scopes of *callers* of this `#routine` (using `routine::variable` notation).
+
+Location may be:
+
+- The exact address the variable must be located at (interpreted as hex if a leading `$` is present, and as decimal otherwise)
+- The name of a `#region` in which the variable should be allocated
+- `ANY`, indicating that the variable may be placed in the first `#region` that has room for it (after all pickier variables have been placed)
+
+Size may be:
+
+- `<n>`: `<n>` bytes are required for the variable.
+- `<n>/<m>`: `<n>` bytes, each byte separated by `<m>` bytes of unused space, are required for this variable. (Useful for funky indexing tricks.)
+- `<n>*<l>/<m>`: `<n>` bytes, each group of `<l>` bytes separated by `<m>` bytes of unused space, are required for this variable. (Useful for even more funky indexing tricks.)
+- `BYTE`, `WORD`, and `PTR`: Syntactic sugar for `1`, `2`, and `2`, respectively.
+
+(The size value is used only when placing the variables; Hubris has no choice but to take it on faith that your code accesses the variables in a manner consistent with their sizes.)
+
+Extra parameters:
+
+- `PERSIST`: The variable's lifetime is the entire program, rather than a single call to its containing scope. (This is redundant for `#global`s.) A `PERSIST` variable may not share a memory location with any other variable, so use these sparingly.
+
+## Flags
+
+    #<type>flag <name> <...>
+
+Declares an atomic boolean Flag. Flags are implemented using the Rockwell `SMBx`/`RMBx`/`BBSx`/`BBRx` instructions. They will always live in the "lowest" `#region`; therefore, if Flags are used, the "lowest" `#region` must be contained entirely in the zero page.
+
+Types, scoping rules, and extra parameters are the same as for variable declarations. Be aware that a memory byte that is used for Flags will not be used for any other purpose; one function with 2048 local Flags will prevent any non-Flag use of the zero page!
+
+    #branchflagset <name> <label>
+    #branchflagclear <name> <label>
+    #branchflagreset <name> <label>
+
+Corresponds to the `BBSx`/`BBRx` instructions. Atomically tests the Flag and branches to `<label>` if it is currently set (`#branchflagset`) or clear (`#branchflagclear`/`#branchflagreset`).
+
+    #setflag <name>
+    #clearflag <name>
+    #resetflag <name>
+
+Corresponds to the `SMBx`/`RMBx` instructions. Atomically sets (`#setflag`) or clears (`#clearflag`/`#resetflag`) the Flag.
+
+## Exports
+
+    #export <name> [<exportedname>]
+
+**NOT IMPLEMENTED YET**
+
+`<name>` is a variable active in the current scope. A symbol for this variable will be exported to assembly code. If `<exportedname>` is provided that will be the symbol name, otherwise the variable's name is used. This currently must occur inside a `#routine`, even if it is a global being exported.
+
