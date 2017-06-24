@@ -40,9 +40,9 @@ local dec_value = C(lpeg.R"09"*lpeg.R"09"^-4) * Cc(10) / tonumber
 value_extractor = hex_value + dec_value
 -- varsize_matcher
 local function rep(x) return x, x end
-local sbs_matcher = dec_value * "*" * dec_value * "/" * dec_value
-local ss_matcher = dec_value * Cc(1) * "/" * dec_value
-local s_matcher = dec_value / rep * Cc(0)
+local sbs_matcher = value_extractor * "*" * value_extractor * "/" * value_extractor
+local ss_matcher = value_extractor * Cc(1) * "/" * value_extractor
+local s_matcher = value_extractor / rep * Cc(0)
 varsize_matcher = (("BYTE" * Cc(1) * Cc(1) * Cc(0))
       + (("WORD"+P"PTR") * Cc(2) * Cc(2) * Cc(0))
       + sbs_matcher + ss_matcher + s_matcher) * -1
