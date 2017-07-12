@@ -1599,7 +1599,7 @@ function do_assemble_pass()\
    for _,inpath in ipairs(asm_files) do\
       local outpath = outdir..DIRSEP..inpath..\".o\"\
       make_directories_leading_up_to(outpath)\
-      local cmd = \"wla-65c02 -o \"..inpath..\" \"..outpath\
+      local cmd = \"wla-65c02 -o \"..outpath..\" \"..inpath\
       -- print(cmd)\
       if not os.execute(cmd) then\
          compiler_error(inpath, nil, \"wla-65c02 errored out\")\
