@@ -953,6 +953,7 @@ local function recursively_connect(entry_point, routine, recursion_check)\
          compiler_error(routine.file, routine.start_line,\
                         \"Parent routine %q does not exist\", parent_name)\
       else\
+         routine.is_subroutine = true\
          routine.parent_scope = routines[parent_name]\
       end\
    end\
@@ -1044,10 +1045,11 @@ local function recursively_set_bank_and_slot(routine)\
          routine.slot = groups[routine.group].slot\
       end\
    else\
-      if routine.parent_routine then\
-         recursively_set_bank_and_slot(routine.parent_routine)\
-         routine.bank = routine.parent_routine.bank\
-         routine.slot = routine.parent_routine.slot\
+      if routine.is_subroutine then\
+         recursively_set_bank_and_slot(routine.parent_scope)\
+         routine.bank = routine.parent_scope.bank\
+         routine.slot = routine.parent_scope.slot\
+         routine.group = routine.parent_scope.group\
       elseif bankcount > 1 then\
          compiler_error(routine.file, routine.line,\
                         \"ENTRY routines in multibank cartridges must have a GROUP tag\")\
