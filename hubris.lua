@@ -1104,11 +1104,27 @@ function do_connect_pass()\
       recursively_connect(entry_point, entry_point, recursion_check)\
       assert(next(recursion_check) == nil, \"recursion_check not clean!\")\
    end\
+   -- - quickly eliminate dead routines (except longcalls)\
+   for name, routine in pairs(routines) do\
+      if routine.top_scope == nil and not name:match(\"::glue_longcall[0-7]$\")\
+      then\
+         if routine.is_called_unsafely then\
+            compiler_error(routine.file, routine.first_line,\
+                           \"Routine %q is called only UNSAFEly.\", name)\
+         else\
+            if should_print_dead_routines and routine.name then\
+               print(\"Warning: \"..routine.file..\":\"..routine.start_line..\":\"\
+                        ..routine.name..\" is a dead routine\")\
+            end\
+            routines[name] = nil\
+         end\
+      end\
+   end\
    -- - determine which longcall routines are required\
    for _, routine in pairs(routines) do\
       accumulate_longcalls(routine)\
    end\
-   -- - quickly eliminate dead routines\
+   -- - quickly eliminate dead routines again (including longcalls)\
    for name, routine in pairs(routines) do\
       if routine.top_scope == nil then\
          if routine.is_called_unsafely then\
