@@ -160,7 +160,7 @@ function do_generate_pass()
          elseif line.type == "bfc" then
             local var,bit = resolve_flag(line.flag)
             if not var then
-               compiler_error(routine.file, line.n, "Unknown flag")
+               compiler_error(routine.file, line.n, "Unknown flag: %s", line.flag)
             else
                f:write("\tBBR",bit," ",identifier_mangling_function(var),", ",
                        line.label,"\n")
@@ -168,7 +168,7 @@ function do_generate_pass()
          elseif line.type == "bfs" then
             local var,bit = resolve_flag(line.flag)
             if not var then
-               compiler_error(routine.file, line.n, "Unknown flag")
+               compiler_error(routine.file, line.n, "Unknown flag: %s", line.flag)
             else
                f:write("\tBBS",bit," ",identifier_mangling_function(var),", ",
                        line.label,"\n")
@@ -176,14 +176,14 @@ function do_generate_pass()
          elseif line.type == "clearflag" then
             local var,bit = resolve_flag(line.flag)
             if not var then
-               compiler_error(routine.file, line.n, "Unknown flag")
+               compiler_error(routine.file, line.n, "Unknown flag: %s", line.flag)
             else
                f:write("\tRMB",bit," ",identifier_mangling_function(var),"\n")
             end
          elseif line.type == "setflag" then
             local var,bit = resolve_flag(line.flag)
             if not var then
-               compiler_error(routine.file, line.n, "Unknown flag")
+               compiler_error(routine.file, line.n, "Unknown flag: %s", line.flag)
             else
                f:write("\tSMB",bit," ",identifier_mangling_function(var),"\n")
             end
