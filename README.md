@@ -249,9 +249,9 @@ You must implement your own `glue_longcallSLOT` routines according to your own u
             LDA r_BankSelect
             PHA
             ; Push the return address, as if by JSR
-            LDA #<_tail
+            LDA #>(_tail-1)
             PHA
-            LDA #>_tail
+            LDA #<(_tail-1)
             PHA
             ; Activate the target bank in slot 0
             LDA target_bank
