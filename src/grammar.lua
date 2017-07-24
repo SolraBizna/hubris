@@ -39,13 +39,12 @@ local hex_value = lpeg.P"$" * C(lpeg.R("09","AF","af")*lpeg.R("09","AF","af")^-3
 local dec_value = C(lpeg.R"09"*lpeg.R"09"^-4) * Cc(10) / tonumber
 value_extractor = hex_value + dec_value
 -- varsize_matcher
-local function rep(x) return x, x end
 local sbs_matcher = value_extractor * "*" * value_extractor * "/" * value_extractor
 local ss_matcher = value_extractor * Cc(1) * "/" * value_extractor
 local sb_matcher = value_extractor * "*" * value_extractor * Cc(0)
-local s_matcher = value_extractor / rep * Cc(0)
+local s_matcher = value_extractor * Cc(1) * Cc(0)
 varsize_matcher = (("BYTE" * Cc(1) * Cc(1) * Cc(0))
-      + (("WORD"+P"PTR") * Cc(2) * Cc(2) * Cc(0))
+      + (("WORD"+P"PTR") * Cc(2) * Cc(1) * Cc(0))
       + sbs_matcher + sb_matcher + ss_matcher + s_matcher) * -1
 -- good_label_matcher
 good_label_matcher = P"+"^1+P"-"^1+identifier_matcher

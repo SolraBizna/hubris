@@ -43,11 +43,12 @@ local function variable(dest_table, vardata, params)
          return
       end
    end
-   vardata.size, vardata.block, vardata.stride = lpeg.match(varsize_matcher, table.remove(params, 1))
-   if not vardata.size then
+   vardata.count, vardata.block, vardata.stride = lpeg.match(varsize_matcher, table.remove(params, 1))
+   if not vardata.count then
       eat_error("Size value is invalid")
       return
    end
+   vardata.size = vardata.count * vardata.block
    vardata.overhead = (vardata.size + vardata.block - 1) // vardata.block
       * vardata.stride + vardata.size
    vardata.name = table.remove(params, 1)
