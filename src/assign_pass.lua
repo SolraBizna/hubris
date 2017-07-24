@@ -76,13 +76,7 @@ local function assign_flag(flag)
    error("NOTREACHED")
 end
 
-local function try_assign_into_region(var, region)
-   for loc=region.start, region.endut - var.overhead do
-      if try_assign_to_location(var, loc) then return true end
-   end
-end
-
-local function try_assign_to_location(var, loc)
+local function try_assign_to_location(var, loc, region)
    for byte=0, var.size-1 do
       local addr = loc + (byte//var.block)*var.stride + byte
       if assignments[addr] then
@@ -101,7 +95,7 @@ local function try_assign_to_location(var, loc)
    end
    for byte=0, var.size-1 do
       local addr = loc + (byte//var.block)*var.stride + byte
-      assignments[addr] = assignments[addr] or {}
+      assignments[addr] = assignments[addr] or {region=region}
       table.insert(assignments[addr], var)
       if var.persist then assignments[addr].persist = true
       else
@@ -119,7 +113,7 @@ end
 
 local function try_assign_into_region(var, region)
    for loc=region.start, region.endut - var.overhead do
-      if try_assign_to_location(var, loc) then return true end
+      if try_assign_to_location(var, loc, region) then return true end
    end
 end
 
@@ -198,7 +192,8 @@ function do_assign_pass()
                         "No room in any region")
       end
    end
-   if num_errors == 0 and should_print_variable_assignments then
+   if num_errors ~= 0 then return end
+   if should_print_variable_assignments then
       local t = {}
       for n, flag in pairs(big_table_of_flags) do
          local var = program_globals[flag.var]
@@ -233,6 +228,41 @@ function do_assign_pass()
       end
       for n=1,#t do
          print(t[n])
+      end
+   end
+   if should_print_region_utilization then
+      for _, region in ipairs(memory_regions) do
+         region.persist = 0
+         region.dynamic = 0
+         region.size = (region.stop - region.start) + 1
+      end
+      local unassigned_region = {persist=0, dynamic=0, name="(none)"}
+      memory_regions[#memory_regions+1] = unassigned_region
+      for addr, assign in pairs(assignments) do
+         if not assign.region then
+            for _, region in ipairs(memory_regions) do
+               if region ~= unassigned_region
+               and addr >= region.start and addr <= region.stop then
+                  assign.region = region
+                  break
+               end
+            end
+            if not assign.region then
+               assign.region = unassigned_region
+            end
+         end
+         if assign.persist then
+            assign.region.persist = assign.region.persist + 1
+         else
+            assign.region.dynamic = assign.region.dynamic + 1
+         end
+      end
+      print("Region\tExcl\tShared\tFree")
+      for _, region in ipairs(memory_regions) do
+         print(region.name, region.persist,
+               region.size and region.dynamic or "N/A",
+               region.size and (region.size - region.persist - region.dynamic)
+                  or "N/A");
       end
    end
 end

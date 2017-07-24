@@ -294,6 +294,7 @@ Size may be:
 
 - `<n>`: `<n>` contiguous bytes are required for the variable.
 - `<n>/<m>`: `<n>` one-byte slots, each separated by `<m>` bytes of unused space, are required for this variable. (Useful for funky indexing tricks.)
+- `<n>*<l>`: `<n>` `<l>`-byte slots are required for this variable.
 - `<n>*<l>/<m>`: `<n>` `<l>`-byte slots, each separated by `<m>` bytes of unused space, are required for this variable. (Useful for even more funky indexing tricks.)
 - `BYTE`, `WORD`, and `PTR`: Syntactic sugar for `1`, `2`, and `2`, respectively.
 

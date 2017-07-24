@@ -30,7 +30,7 @@ setmetatable(_G, _mt)\
 \
 globals(\"DIRSEP\", \"print_memory_usage\", \"should_print_call_graph\",\
         \"should_print_dead_routines\", \"should_print_variable_assignments\",\
-        \"should_print_exclusion_sets\",\
+        \"should_print_exclusion_sets\", \"should_print_region_utilization\",\
         \"should_clobber_accumulator_on_intercalls\", \"outdir\", \"indirs\")\
 \
 DIRSEP = assert(package.config:match(\"[^\\n]+\"))\
@@ -39,6 +39,7 @@ should_print_call_graph = false\
 should_print_dead_routines = false\
 should_print_variable_assignments = false\
 should_print_exclusion_sets = false\
+should_print_region_utilization = false\
 should_clobber_accumulator_on_intercalls = false\
 \
 -- Parse command line options\
@@ -52,7 +53,17 @@ while n <= #arg do\
       local opts = table.remove(arg, n)\
       for n=2,#opts do\
          local opt = opts:sub(n,n)\
-         if opt == \"m\" then\
+         if opt == \"a\" then\
+            should_print_variable_assignments = true\
+         elseif opt == \"c\" then\
+            should_print_call_graph = true\
+         elseif opt == \"d\" then\
+            should_print_dead_routines = true\
+         elseif opt == \"e\" then\
+            should_print_exclusion_sets = true\
+         elseif opt == \"i\" then\
+            should_clobber_accumulator_on_intercalls = true\
+         elseif opt == \"m\" then\
             function print_memory_usage(section)\
                local mem_pre = collectgarbage \"count\"\
                collectgarbage \"collect\"\
@@ -60,16 +71,8 @@ while n <= #arg do\
                print((\"Memory at %9s: %6i KiB -> collect -> %6i KiB\")\
                      :format(section, math.ceil(mem_pre), math.ceil(mem_post)))\
             end\
-         elseif opt == \"c\" then\
-            should_print_call_graph = true\
-         elseif opt == \"d\" then\
-            should_print_dead_routines = true\
-         elseif opt == \"e\" then\
-            should_print_exclusion_sets = true\
-         elseif opt == \"a\" then\
-            should_print_variable_assignments = true\
-         elseif opt == \"i\" then\
-            should_clobber_accumulator_on_intercalls = true\
+         elseif opt == \"r\" then\
+            should_print_region_utilization = true\
          else\
             io.stderr:write(\"Unknown option: \"..opt)\
             cmdline_bad = true\
@@ -357,10 +360,11 @@ value_extractor = hex_value + dec_value\
 local function rep(x) return x, x end\
 local sbs_matcher = value_extractor * \"*\" * value_extractor * \"/\" * value_extractor\
 local ss_matcher = value_extractor * Cc(1) * \"/\" * value_extractor\
+local sb_matcher = value_extractor * \"*\" * value_extractor * Cc(0)\
 local s_matcher = value_extractor / rep * Cc(0)\
 varsize_matcher = ((\"BYTE\" * Cc(1) * Cc(1) * Cc(0))\
       + ((\"WORD\"+P\"PTR\") * Cc(2) * Cc(2) * Cc(0))\
-      + sbs_matcher + ss_matcher + s_matcher) * -1\
+      + sbs_matcher + sb_matcher + ss_matcher + s_matcher) * -1\
 -- good_label_matcher\
 good_label_matcher = P\"+\"^1+P\"-\"^1+identifier_matcher\
 -- routine_name_validator\
@@ -1249,13 +1253,7 @@ local function assign_flag(flag)\
    error(\"NOTREACHED\")\
 end\
 \
-local function try_assign_into_region(var, region)\
-   for loc=region.start, region.endut - var.overhead do\
-      if try_assign_to_location(var, loc) then return true end\
-   end\
-end\
-\
-local function try_assign_to_location(var, loc)\
+local function try_assign_to_location(var, loc, region)\
    for byte=0, var.size-1 do\
       local addr = loc + (byte//var.block)*var.stride + byte\
       if assignments[addr] then\
@@ -1274,7 +1272,7 @@ local function try_assign_to_location(var, loc)\
    end\
    for byte=0, var.size-1 do\
       local addr = loc + (byte//var.block)*var.stride + byte\
-      assignments[addr] = assignments[addr] or {}\
+      assignments[addr] = assignments[addr] or {region=region}\
       table.insert(assignments[addr], var)\
       if var.persist then assignments[addr].persist = true\
       else\
@@ -1292,7 +1290,7 @@ end\
 \
 local function try_assign_into_region(var, region)\
    for loc=region.start, region.endut - var.overhead do\
-      if try_assign_to_location(var, loc) then return true end\
+      if try_assign_to_location(var, loc, region) then return true end\
    end\
 end\
 \
@@ -1371,7 +1369,8 @@ function do_assign_pass()\
                         \"No room in any region\")\
       end\
    end\
-   if num_errors == 0 and should_print_variable_assignments then\
+   if num_errors ~= 0 then return end\
+   if should_print_variable_assignments then\
       local t = {}\
       for n, flag in pairs(big_table_of_flags) do\
          local var = program_globals[flag.var]\
@@ -1406,6 +1405,41 @@ function do_assign_pass()\
       end\
       for n=1,#t do\
          print(t[n])\
+      end\
+   end\
+   if should_print_region_utilization then\
+      for _, region in ipairs(memory_regions) do\
+         region.persist = 0\
+         region.dynamic = 0\
+         region.size = (region.stop - region.start) + 1\
+      end\
+      local unassigned_region = {persist=0, dynamic=0, name=\"(none)\"}\
+      memory_regions[#memory_regions+1] = unassigned_region\
+      for addr, assign in pairs(assignments) do\
+         if not assign.region then\
+            for _, region in ipairs(memory_regions) do\
+               if region ~= unassigned_region\
+               and addr >= region.start and addr <= region.stop then\
+                  assign.region = region\
+                  break\
+               end\
+            end\
+            if not assign.region then\
+               assign.region = unassigned_region\
+            end\
+         end\
+         if assign.persist then\
+            assign.region.persist = assign.region.persist + 1\
+         else\
+            assign.region.dynamic = assign.region.dynamic + 1\
+         end\
+      end\
+      print(\"Region\\tExcl\\tShared\\tFree\")\
+      for _, region in ipairs(memory_regions) do\
+         print(region.name, region.persist,\
+               region.size and region.dynamic or \"N/A\",\
+               region.size and (region.size - region.persist - region.dynamic)\
+                  or \"N/A\");\
       end\
    end\
 end\
@@ -1572,7 +1606,7 @@ function do_generate_pass()\
          elseif line.type == \"bfc\" then\
             local var,bit = resolve_flag(line.flag)\
             if not var then\
-               compiler_error(routine.file, line.n, \"Unknown flag\")\
+               compiler_error(routine.file, line.n, \"Unknown flag: %s\", line.flag)\
             else\
                f:write(\"\\tBBR\",bit,\" \",identifier_mangling_function(var),\", \",\
                        line.label,\"\\n\")\
@@ -1580,7 +1614,7 @@ function do_generate_pass()\
          elseif line.type == \"bfs\" then\
             local var,bit = resolve_flag(line.flag)\
             if not var then\
-               compiler_error(routine.file, line.n, \"Unknown flag\")\
+               compiler_error(routine.file, line.n, \"Unknown flag: %s\", line.flag)\
             else\
                f:write(\"\\tBBS\",bit,\" \",identifier_mangling_function(var),\", \",\
                        line.label,\"\\n\")\
@@ -1588,14 +1622,14 @@ function do_generate_pass()\
          elseif line.type == \"clearflag\" then\
             local var,bit = resolve_flag(line.flag)\
             if not var then\
-               compiler_error(routine.file, line.n, \"Unknown flag\")\
+               compiler_error(routine.file, line.n, \"Unknown flag: %s\", line.flag)\
             else\
                f:write(\"\\tRMB\",bit,\" \",identifier_mangling_function(var),\"\\n\")\
             end\
          elseif line.type == \"setflag\" then\
             local var,bit = resolve_flag(line.flag)\
             if not var then\
-               compiler_error(routine.file, line.n, \"Unknown flag\")\
+               compiler_error(routine.file, line.n, \"Unknown flag: %s\", line.flag)\
             else\
                f:write(\"\\tSMB\",bit,\" \",identifier_mangling_function(var),\"\\n\")\
             end\

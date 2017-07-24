@@ -24,7 +24,7 @@ setmetatable(_G, _mt)
 
 globals("DIRSEP", "print_memory_usage", "should_print_call_graph",
         "should_print_dead_routines", "should_print_variable_assignments",
-        "should_print_exclusion_sets",
+        "should_print_exclusion_sets", "should_print_region_utilization",
         "should_clobber_accumulator_on_intercalls", "outdir", "indirs")
 
 DIRSEP = assert(package.config:match("[^\n]+"))
@@ -33,6 +33,7 @@ should_print_call_graph = false
 should_print_dead_routines = false
 should_print_variable_assignments = false
 should_print_exclusion_sets = false
+should_print_region_utilization = false
 should_clobber_accumulator_on_intercalls = false
 
 -- Parse command line options
@@ -46,7 +47,17 @@ while n <= #arg do
       local opts = table.remove(arg, n)
       for n=2,#opts do
          local opt = opts:sub(n,n)
-         if opt == "m" then
+         if opt == "a" then
+            should_print_variable_assignments = true
+         elseif opt == "c" then
+            should_print_call_graph = true
+         elseif opt == "d" then
+            should_print_dead_routines = true
+         elseif opt == "e" then
+            should_print_exclusion_sets = true
+         elseif opt == "i" then
+            should_clobber_accumulator_on_intercalls = true
+         elseif opt == "m" then
             function print_memory_usage(section)
                local mem_pre = collectgarbage "count"
                collectgarbage "collect"
@@ -54,16 +65,8 @@ while n <= #arg do
                print(("Memory at %9s: %6i KiB -> collect -> %6i KiB")
                      :format(section, math.ceil(mem_pre), math.ceil(mem_post)))
             end
-         elseif opt == "c" then
-            should_print_call_graph = true
-         elseif opt == "d" then
-            should_print_dead_routines = true
-         elseif opt == "e" then
-            should_print_exclusion_sets = true
-         elseif opt == "a" then
-            should_print_variable_assignments = true
-         elseif opt == "i" then
-            should_clobber_accumulator_on_intercalls = true
+         elseif opt == "r" then
+            should_print_region_utilization = true
          else
             io.stderr:write("Unknown option: "..opt)
             cmdline_bad = true
