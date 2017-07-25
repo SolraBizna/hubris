@@ -179,6 +179,20 @@ end
 
 function do_connect_pass()
    local recursion_check = {}
+   -- - set up fake call lines for indirectcallers
+   for name, routine in pairs(routines) do
+      for targetname, line in pairs(routine.indirectcallers) do
+         local target = routines[targetname]
+         if not target then
+            compiler_error(routine.file, line,
+                           "Cannot resolve routine %q", targetname)
+         else
+            target.lines[#target.lines+1] = {
+               type="call", n=nil, regs={}, routine=name, fake=true
+            }
+         end
+      end
+   end
    -- - assign each routine exactly one top scope, and an ID in that scope
    -- - ensure that recursion does not happen
    for _, entry_point in ipairs(entry_points) do
@@ -186,8 +200,12 @@ function do_connect_pass()
       recursively_connect(entry_point, entry_point, recursion_check)
       assert(next(recursion_check) == nil, "recursion_check not clean!")
    end
+   -- - remove fake call lines for indirectcallers
    -- - quickly eliminate dead routines (except longcalls)
    for name, routine in pairs(routines) do
+      while #routine.lines > 0 and routine.lines[#routine.lines].fake do
+         table.remove(routine.lines, #routine.lines)
+      end
       if routine.top_scope == nil and not name:match("::glue_longcall[0-7]$")
       then
          if routine.is_called_unsafely then

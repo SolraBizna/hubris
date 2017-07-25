@@ -271,6 +271,15 @@ As you can see, long calls will have a significant amount of overhead compared t
 
 (The call to the `longcall` glue bypasses recursion checks and certain other housekeeping, so you must be careful what you write inside. For one thing, you should only provide `#params`. If you are having trouble understanding these principles, you should consider just using the above code verbatim.)
 
+## Indirect Callers
+
+    #indirectcaller <routine>
+    #indirectcallers <routine>, <routine>, ...
+
+When placed within a Routine, indicates that that routine will be called through a function pointer, by the given routines. Hubris behaves as though the listed routines contain a `#call` to this routine, but doesn't actually generate any calling code.
+
+This is an advanced directive. If you don't know why you need it, you don't need it. (But if you do need it, there's no other way to accomplish it without generating spurious code.)
+
 ## Variables
 
 A variable declaration looks like:

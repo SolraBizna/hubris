@@ -267,7 +267,8 @@ function directives.routine(params)
    end
    current_routine = {name=table.remove(params,1), lines={},
                       file=current_file, start_line=current_line, regs={},
-                      callers={}, callees={}, vars={}, flags={}}
+                      callers={}, callees={}, vars={}, flags={},
+                      indirectcallers={}}
    routines[current_routine.name] = current_routine
    local current_register_mode
    while #params > 0 do
@@ -355,6 +356,23 @@ function directives.call(params)
    end
    current_routine.lines[#current_routine.lines+1] = pseudoline
 end
+function directives.indirectcallers(params)
+   if #params < 1 then
+      eat_error("#indirectcallers requires at least one parameter")
+      return
+   end
+   while #params > 0 do
+      local target = table.remove(params, 1)
+      if current_routine.indirectcallers[target] then
+         eat_error("Routine %q specified more than once in #indirectcallers directives", target)
+      elseif target == current_routine.name then
+         eat_error("Routine %q specified in its own #indirectcallers directive", target)
+      else
+         current_routine.indirectcallers[target] = current_line
+      end
+   end
+end
+directives.indirectcaller = directives.indirectcallers
 function directives.branchflagset(params)
    if #params ~= 2 then
       eat_error("#branchflagset requires exactly two parameters")
