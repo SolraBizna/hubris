@@ -119,7 +119,7 @@ local function recursively_set_bank_and_slot(routine)
    if routine.group then
       if not groups[routine.group] then
          compiler_error(routine.file, routine.line,
-                        "no such group")
+                        "no such group %q", routine.group)
          routine.bank = "FAKE"
          routine.slot = routine
       else
