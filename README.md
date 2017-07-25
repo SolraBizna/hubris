@@ -241,7 +241,7 @@ where TARGET, BANK, and SLOT are the target routine and the ROM bank and slot oc
 
 You must implement your own `glue_longcallSLOT` routines according to your own use of slots. For example, if your code follows the convention that slot 0 contains all main routines, and `FixedUtilGroup` is in another slot is always mapped, you might provide:
 
-    #routine Main::glue_longcall0 GROUP FixedUtilGroup CLOBBER Y
+    #routine Main::glue_longcall0 GROUP FixedUtilGroup CLOBBER A, X, Y
     #param fast PTR target
     #param fast BYTE target_bank
             #begin
