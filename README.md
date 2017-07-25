@@ -244,7 +244,7 @@ You must implement your own `glue_longcallSLOT` routines according to your own u
     #routine Main::glue_longcall0 GROUP FixedUtilGroup CLOBBER Y
     #param fast PTR target
     #param fast BYTE target_bank
-    #begin
+            #begin
             ; Save the current slot 0 mapping
             LDA r_BankSelect
             PHA
@@ -264,7 +264,7 @@ You must implement your own `glue_longcallSLOT` routines according to your own u
             ; value, while Y may not. Therefore, we clobber Y here.)
     _tail:  PLY
             STY r_BankSelect
-    #return
+            #return
     #endroutine
 
 As you can see, long calls will have a significant amount of overhead compared to regular ones. This is why you should keep related code in the same bank, if not the same `GROUP`, whenever possible.
