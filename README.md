@@ -333,6 +333,20 @@ Corresponds to the `BBSx`/`BBRx` instructions. Atomically tests the Flag and bra
 
 Corresponds to the `SMBx`/`RMBx` instructions. Atomically sets (`#setflag`) or clears (`#clearflag`/`#resetflag`) the Flag.
 
+## Aliases
+
+    #alias <aliasname> <realname>
+
+Anywhere in assembly source code `<aliasname>` is found, `<realname>` is processed instead. `<realname>` will be processed as if it had been written instead of `<aliasname>` at that point in the source, including possibly being handled as an alias. (Hubris makes no attempt to detect alias loops; processing such a loop will hang the compiler.)
+
+Unlike every other part of Hubris, `#alias` directives take place in the translation unit they're seen in.
+
+Aliases are only processed in assembly source. Aliases do not take effect in Hubris directives.
+
+    #unalias <aliasname>
+
+Forgets a previously-defined alias.
+
 ## Exports
 
     #export <name> [<exportedname>]

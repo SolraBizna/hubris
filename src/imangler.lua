@@ -4,6 +4,9 @@ globals("identifier_mangling_function","identifier_creating_function",
         "active_routine","program_globals","imangle_errors","resolve_flag")
 
 function identifier_mangling_function(id)
+   if current_aliases and current_aliases[id] then
+      return identifier_mangling_function(current_aliases[id])
+   end
    if active_routine then
       local proutine,var = lpeg.match(parent_routine_extractor, id)
       if proutine and active_routine.callees[proutine]

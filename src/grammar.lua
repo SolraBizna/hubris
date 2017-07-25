@@ -1,7 +1,8 @@
 globals("directive_tester","directive_matcher","comment_stripper",
         "identifier_mangler","identifier_matcher","blank_line_tester",
         "value_extractor","varsize_matcher","good_label_matcher",
-        "routine_name_validator","parent_routine_extractor")
+        "routine_name_validator","parent_routine_extractor","aliaser",
+        "current_aliases")
 local lpeg = require "lpeg"
 local C,Ct,Cc,S,P,R = lpeg.C,lpeg.Ct,lpeg.Cc,lpeg.S,lpeg.P,lpeg.R
 -- general-purpose bits
@@ -26,12 +27,22 @@ directive_matcher = EW * "#" * EW * C(identifier_matcher)
 local noncomment_char = dblquote_string + quote_string + (1 - P";");
 comment_stripper = C(noncomment_char^0)
 -- identifier_mangler
+--local mangled_new_id = C(identifier_matcher)/identifier_creating_function
 local mangled_scoped_id = C(scoped_id)/identifier_mangling_function
-local mangled_new_id = C(identifier_matcher)/identifier_creating_function
 identifier_mangler = Ct(
    -- label definitions get mangled differently
    ((mangled_scoped_id*(C":"+#whitespace+-1))+true)
       *(mangled_scoped_id+C(whitespace^1+quote_string+dblquote_string+1))^0
+      * -1
+)/table.concat
+-- aliaser
+local aliased_scoped_id = C(scoped_id)/function(i)
+                                          return current_aliases[i] or i
+                                       end
+aliaser = Ct(
+   -- label definitions get mangled differently
+   ((aliased_scoped_id*(C":"+#whitespace+-1))+true)
+      *(aliased_scoped_id+C(whitespace^1+quote_string+dblquote_string+1))^0
       * -1
 )/table.concat
 -- value_extractor

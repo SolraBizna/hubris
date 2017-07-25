@@ -3,7 +3,7 @@ globals("asm_files", "routines", "entry_points", "tracked_registers",
         "slot_aliases", "groups", "bs", "bankcount")
 
 local lpeg = require "lpeg"
-local current_file, current_line
+local current_file, current_line, current_top_file
 local function eat_error(...)
    return compiler_error(current_file, current_line, ...)
 end
@@ -105,6 +105,28 @@ local function flag(dest_table, flagdata, params)
 end
 
 local directives = {}
+function directives.alias(params)
+   if #params ~= 2 then
+      eat_error("#alias requires two parameters")
+      return
+   end
+   if current_aliases[params[1]] then
+      eat_error("duplicate #alias definition for %q", params[1])
+   else
+      current_aliases[params[1]] = params[2]
+   end
+end
+function directives.unalias(params)
+   if #params ~= 1 then
+      eat_error("#unalias requires one parameter")
+      return
+   end
+   if current_aliases[param[1]] then
+      current_aliases[param[1]] = nil
+   else
+      eat_error("#unalias for nonexistent #alias %q", params[1])
+   end
+end
 function directives.include(params)
    if #params ~= 1 then
       eat_error("#include requires exactly one parameter")
@@ -268,7 +290,8 @@ function directives.routine(params)
    current_routine = {name=table.remove(params,1), lines={},
                       file=current_file, start_line=current_line, regs={},
                       callers={}, callees={}, vars={}, flags={},
-                      indirectcallers={}}
+                      indirectcallers={},
+                      top_file=current_top_file}
    routines[current_routine.name] = current_routine
    local current_register_mode
    while #params > 0 do
@@ -461,7 +484,7 @@ function add_lines_from(f)
          end
       elseif current_routine then
          current_routine.lines[#current_routine.lines+1]
-            = {type="line",n=current_line,l=l}
+            = {type="line",n=current_line,l=lpeg.match(aliaser,l)}
       elseif not lpeg.match(blank_line_tester, l) then
          eat_error("stray nonblank line")
       end
@@ -471,10 +494,13 @@ function add_lines_from(f)
 end
 local function eat_file(src)
    current_file = src
+   current_top_file = src
    current_line = 1
    stop_parsing_file = false
    local f = assert(io.open(src, "rb"))
+   current_aliases = {}
    add_lines_from(f)
+   current_aliases = nil
    f:close()
 end
 
