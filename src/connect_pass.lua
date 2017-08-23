@@ -262,7 +262,13 @@ function do_connect_pass()
    -- - print the exclusion sets
    if should_print_exclusion_sets then
       io.write("exclusion set,callers,callees,routine name\n")
-      for name,routine in pairs(routines) do
+      local routine_list = {}
+      for name in pairs(routines) do
+         table.insert(routine_list, name)
+      end
+      table.sort(routine_list)
+      for _,name in ipairs(routine_list) do
+         local routine = routines[name]
          routine.exclusion_set:write(io.stdout)
          io.write(",")
          routine.callers_set:write(io.stdout)
