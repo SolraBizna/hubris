@@ -851,7 +851,7 @@ directives.endroutine = function(params)\
       eat_error(\"`#endroutine` and `#endroutine NORETURN` are the only valid #endroutine directives\")\
    end\
    if not current_routine.has_begun then\
-      eat_error(\"#routine lacks a #begin\")\
+      eat_error(\"#routine %s lacks a #begin\", current_routine.name)\
    end\
    if params[1] ~= \"NORETURN\" and not current_routine.has_returned then\
       eat_error(\"#routine %s lacks a #return directive, and its #endroutine lacks a `NORETURN` tag\", current_routine.name)\
