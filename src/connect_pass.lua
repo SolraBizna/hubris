@@ -158,6 +158,8 @@ local function accumulate_longcalls(routine)
          else
             routines[longcall_name].callers[routine] = true
             routine.callees[longcall_name] = routines[longcall_name]
+            target.callers[routines[longcall_name]] = true
+            routines[longcall_name].callees[name] = target
             if routines[longcall_name].top_scope == nil then
                routines[longcall_name].top_scope = routine.top_scope
                if next(routines[longcall_name].vars) ~= nil
