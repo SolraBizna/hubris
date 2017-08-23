@@ -92,6 +92,7 @@ Options:
       long calls (leave this on during development, but compile without it for
       release)
 -m: Print memory usage statistics after each pass
+-r: Print region allocation statistics
 ]]
    os.exit(1)
 end
