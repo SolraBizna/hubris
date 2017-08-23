@@ -1239,14 +1239,14 @@ function do_connect_pass()\
    end\
    -- - print the exclusion sets\
    if should_print_exclusion_sets then\
+      io.write(\"exclusion set,callers,callees,routine name\\n\")\
       for name,routine in pairs(routines) do\
-         io.write(name,\"\\t\")\
          routine.exclusion_set:write(io.stdout)\
-         io.write(\" \")\
+         io.write(\",\")\
          routine.callers_set:write(io.stdout)\
-         io.write(\" \")\
+         io.write(\",\")\
          routine.callees_set:write(io.stdout)\
-         io.write(\"\\n\")\
+         io.write(\",\",name,\"\\n\")\
       end\
    end\
 end\
