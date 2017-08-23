@@ -1527,7 +1527,6 @@ local function generate_longcall(f, routine_name, slot, bank, entry, type,\
    local longcall_name = entry.name .. \"::glue_longcall\"..slot\
    assert(routines[longcall_name],\
           \"INTERNAL ERROR: this should have been handled in connect_pass\")\
-   print(file, line)\
    local glue = routines[longcall_name]\
    if not glue.vars.target or not glue.vars.target.param then\
       compiler_error(file, line, \"Glue routine %q missing target param\",\
