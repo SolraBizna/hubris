@@ -1304,7 +1304,7 @@ function do_connect_pass()\
    end\
    -- - print the exclusion sets\
    if should_print_exclusion_sets then\
-      io.write(\"exclusion set,callers,callees,routine name\\n\")\
+      io.write(\"id,exclusion set,callers,callees,routine name\\n\")\
       local routine_list = {}\
       for name in pairs(routines) do\
          table.insert(routine_list, name)\
@@ -1312,6 +1312,12 @@ function do_connect_pass()\
       table.sort(routine_list)\
       for _,name in ipairs(routine_list) do\
          local routine = routines[name]\
+         local id_set = bitset.new(total_number_of_scopes)\
+         if routine.scope_number ~= nil then\
+            id_set:set(routine.scope_number)\
+         end\
+         id_set:write(io.stdout)\
+         io.write(\",\")\
          routine.exclusion_set:write(io.stdout)\
          io.write(\",\")\
          routine.callers_set:write(io.stdout)\
