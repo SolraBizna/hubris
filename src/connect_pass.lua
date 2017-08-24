@@ -179,7 +179,73 @@ local function accumulate_longcalls(routine)
    end
 end
 
+local thin_lines = {
+   line="│ ",
+   branch_with_next="├─",
+   branch_without_next="└─",
+}
+
+local thick_lines = {
+   line="┃ ",
+   branch_with_next="┣━",
+   branch_without_next="┗━",
+}
+
+local function print_callees(routine, level, lines)
+   local simplet, intert, longt = {l=thin_lines}, {l=thin_lines}, {l=thick_lines}
+   for name,target in pairs(routine.callees) do
+      if name:match("::glue_longcall[0-7]$") then
+         -- ignore it
+      elseif target.group == routine.group then
+         simplet[#simplet+1] = name
+      elseif target.slot ~= routine.slot or target.bank == routine.bank then
+         intert[#intert+1] = name
+      else
+         longt[#longt+1] = name
+      end
+   end
+   table.sort(simplet)
+   table.sort(intert)
+   table.sort(longt)
+   local tt = {simplet}
+   if #intert > 0 then tt[#tt+1] = intert end
+   if #longt > 0 then tt[#tt+1] = longt end
+   while #tt > 0 do
+      lines[level+1] = tt[1].l.line
+      for n=1,#tt[1] do
+         for i=1,level do
+            io.write(lines[i])
+         end
+         if n == #tt[1] then
+            if #tt > 1 then
+               io.write(tt[1].l.branch_with_next)
+            else
+               lines[level+1] = "  "
+               io.write(tt[1].l.branch_without_next)
+            end
+         else
+            io.write(tt[1].l.branch_with_next)
+         end
+         io.write(tt[1][n],"\n")
+         print_callees(routine.callees[tt[1][n]], level+1, lines)
+      end
+      table.remove(tt, 1)
+      if #tt > 0 then
+         for i=1,level do
+            io.write(lines[i])
+         end
+         io.write("┆","\n")
+      end
+   end
+end
+
+local function print_pretty_call_graph(top_level_routine)
+   io.write(top_level_routine.name,"\n")
+   print_callees(top_level_routine, 0, {}, true)
+end
+
 function do_connect_pass()
+   -- - sort entry points
    local recursion_check = {}
    -- - set up fake call lines for indirectcallers
    for name, routine in pairs(routines) do
@@ -247,16 +313,8 @@ function do_connect_pass()
    end
    -- - print a pretty call graph
    if should_print_call_graph then
-      -- TODO: make this better
-      for name,routine in pairs(routines) do
-         print(name)
-         if next(routine.callers) ~= nil then
-            for caller in pairs(routine.callers) do
-               print(" \\" .. caller.name)
-            end
-         else
-            print(" (no callers)")
-         end
+      for _,v in ipairs(entry_points) do
+         print_pretty_call_graph(v)
       end
    end
    -- - print the exclusion sets
