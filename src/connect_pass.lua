@@ -81,6 +81,8 @@ local function recursively_make_callers_set(routine)
       end
       for caller in pairs(routine.callers) do
          recursively_make_callers_set(caller)
+      end
+      for caller in pairs(routine.callers) do
          routine.callers_set:union(caller.callers_set)
       end
    end
@@ -95,6 +97,8 @@ local function recursively_make_callees_set(routine)
       end
       for _,callee in pairs(routine.callees) do
          recursively_make_callees_set(callee)
+      end
+      for _,callee in pairs(routine.callees) do
          routine.callees_set:union(callee.callees_set)
       end
    end
@@ -156,10 +160,10 @@ local function accumulate_longcalls(routine)
                            longcall_name)
             routines[longcall_name] = {bank=-1,slot=-1,callers={},callees={}}
          else
+            -- if we add the longcall routine to the graph properly, the fact
+            -- that it breaks the recursion rules creates huge problems
             routines[longcall_name].callers[routine] = true
-            routine.callees[longcall_name] = routines[longcall_name]
-            target.callers[routines[longcall_name]] = true
-            routines[longcall_name].callees[name] = target
+            routines[longcall_name].callers[target] = true
             if routines[longcall_name].top_scope == nil then
                routines[longcall_name].top_scope = routine.top_scope
                if next(routines[longcall_name].vars) ~= nil
