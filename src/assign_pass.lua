@@ -207,6 +207,9 @@ function do_assign_pass()
                assign[n].name = assign[n].name .. " (" .. table.concat(assign[n].flat, ", ") .. ")"
                assign[n].flat = nil
             end
+            if assign[n].routine then
+               assign[n].name = assign[n].routine.name .. "::" .. assign[n].name
+            end
             subt[#subt+1] = assign[n].name
          end
          table.sort(subt)
