@@ -1,6 +1,6 @@
 globals("asm_files", "routines", "entry_points", "tracked_registers",
         "memory_regions", "do_eat_pass", "program_global_flags",
-        "slot_aliases", "groups", "bs", "bankcount")
+        "slot_aliases", "groups", "bs", "bankcount", "commons")
 
 local lpeg = require "lpeg"
 local current_file, current_line, current_top_file
@@ -11,6 +11,7 @@ end
 asm_files = {}
 routines = {}
 entry_points = {}
+commons = {}
 tracked_registers = {
    A={name="A",push="PHA",pull="PLA"},
    X={name="X",push="PHX",pull="PLX"},
@@ -24,7 +25,7 @@ program_global_flags = {}
 slot_aliases = {}
 groups = {}
 memory_regions = {}
-local current_routine
+local current_routine, current_common
 local stop_parsing_file
 local add_lines_from
 
@@ -274,6 +275,10 @@ function directives.routine(params)
       eat_error("previous #routine did not #endroutine yet")
       stop_parsing_file = true
       return
+   elseif current_common ~= nil then
+      eat_error("previous #common did not #endcommon yet")
+      stop_parsing_file = true
+      return
    elseif #params < 1 then
       eat_error("#routine requires at least one parameter")
       stop_parsing_file = true
@@ -459,7 +464,9 @@ directives["return"] = function(params)
       = {type="return",n=current_line,interrupt=params[1] == "INTERRUPT"}
 end
 directives.endroutine = function(params)
-   if #params ~= 0 and (#params ~= 1 or params[1] ~= "NORETURN") then
+   if not current_routine then
+      eat_error("`#endroutine` without `#routine`")
+   elseif #params ~= 0 and (#params ~= 1 or params[1] ~= "NORETURN") then
       eat_error("`#endroutine` and `#endroutine NORETURN` are the only valid #endroutine directives")
    end
    if not current_routine.has_begun then
@@ -469,6 +476,31 @@ directives.endroutine = function(params)
       eat_error("#routine %s lacks a #return directive, and its #endroutine lacks a `NORETURN` tag", current_routine.name)
    end
    current_routine = nil
+end
+function directives.common(params)
+   if current_routine ~= nil then
+      eat_error("previous #routine did not #endroutine yet")
+      stop_parsing_file = true
+      return
+   elseif current_common ~= nil then
+      eat_error("previous #common did not #endcommon yet")
+      stop_parsing_file = true
+      return
+   elseif #params ~= 0 then
+      eat_error("#common does not take parameters")
+      stop_parsing_file = true
+      return
+   end
+   current_common = {file=current_file, start_line=current_line, lines={}}
+   commons[#commons+1] = current_common
+end
+directives.endcommon = function(params)
+   if not current_common then
+      eat_error("`#endcommon` without `#common`")
+   elseif #params ~= 0 then
+      eat_error("`#endcommon` does not take parameters")
+   end
+   current_common = nil
 end
 function add_lines_from(f)
    for l in f:lines() do
@@ -485,6 +517,9 @@ function add_lines_from(f)
       elseif current_routine then
          current_routine.lines[#current_routine.lines+1]
             = {type="line",n=current_line,l=lpeg.match(aliaser,l)}
+      elseif current_common then
+         current_common.lines[#current_common.lines+1]
+            = lpeg.match(aliaser, l)
       elseif not lpeg.match(blank_line_tester, l) then
          eat_error("stray nonblank line")
       end

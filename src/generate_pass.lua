@@ -29,15 +29,7 @@ function do_generate_pass()
       local outpath = outdir .. DIRSEP .. "hubris_" .. name:gsub(":","-") .. ".65c"
       make_directories_leading_up_to(outpath)
       local f = assert(io.open(outpath, "wb"))
-      f:write(".INCLUDE \"",outdir,DIRSEP,[[memorymap"
-.MACRO WAI
-.DB $CB
-.ENDM
-.MACRO STP
-.DB $DB
-.ENDM
-]])
-      f:write(".BANK ",routine.bank," SLOT ",routine.slot,"\n")
+      f:write(".INCLUDE \"",outdir,DIRSEP,"common\"\n\n.BANK ",routine.bank," SLOT ",routine.slot,"\n")
       if routine.orga then
          f:write(".ORGA ",routine.orga,"\n.SECTION \"hubris_",
                  name, "\" FORCE\n")

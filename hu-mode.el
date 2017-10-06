@@ -31,7 +31,7 @@
 (defconst hu-font-lock-keywords
   (list
    '("\\<UNSAFE\\>" .font-lock-warning-face)
-   '("^[[:space:]]*#\\(?:alias\\|b\\(?:ankcount\\|egin\\|ranchflag\\(?:clear\\|\\(?:re\\)?set\\)\\|s\\)\\|c\\(?:all\\|learflag\\)\\|endroutine\\|g\\(?:lobal\\(?:flag\\)?\\|roup\\)\\|in\\(?:clude\\|directcallers?\\)\\|local\\(?:flag\\)?\\|param\\(?:flag\\)?\\|r\\(?:e\\(?:gion\\|setflag\\|turn\\)\\|outine\\)\\|s\\(?:etflag\\|lot\\|ublocal\\(?:flag\\)?\\)\\|unalias\\)\\>" . font-lock-builtin-face)
+   '("^[[:space:]]*#\\(?:alias\\|b\\(?:ankcount\\|egin\\|ranchflag\\(?:clear\\|\\(?:re\\)?set\\)\\|s\\)\\|c\\(?:all\\|learflag\\|ommon\\)\\|end\\(?:routine\\|common\\)\\|g\\(?:lobal\\(?:flag\\)?\\|roup\\)\\|in\\(?:clude\\|directcallers?\\)\\|local\\(?:flag\\)?\\|param\\(?:flag\\)?\\|r\\(?:e\\(?:gion\\|setflag\\|turn\\)\\|outine\\)\\|s\\(?:etflag\\|lot\\|ublocal\\(?:flag\\)?\\)\\|unalias\\)\\>" . font-lock-builtin-face)
    '("^[[:space:]]*#\\sw+" . font-lock-warning-face)
    '("#" . font-lock-constant-face)
    '("\\<\\(?:\\$[0-9A-Fa-f]+\\|[0-9]+\\)\\>" . font-lock-constant-face)

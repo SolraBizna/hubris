@@ -4,8 +4,8 @@ do_eat_pass()
 print_memory_usage("eat")
 maybe_error_exit()
 
-do_memorymap_pass()
-print_memory_usage("memorymap")
+do_common_pass()
+print_memory_usage("common")
 maybe_error_exit()
 
 do_connect_pass()

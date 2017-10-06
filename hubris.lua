@@ -389,7 +389,7 @@ parent_routine_extractor = C(((routine_name * P\"::\") - (routine_name*P\"::\"*r
 ","@src/grammar.lua")()
 load("globals(\"asm_files\", \"routines\", \"entry_points\", \"tracked_registers\",\
         \"memory_regions\", \"do_eat_pass\", \"program_global_flags\",\
-        \"slot_aliases\", \"groups\", \"bs\", \"bankcount\")\
+        \"slot_aliases\", \"groups\", \"bs\", \"bankcount\", \"commons\")\
 \
 local lpeg = require \"lpeg\"\
 local current_file, current_line, current_top_file\
@@ -400,6 +400,7 @@ end\
 asm_files = {}\
 routines = {}\
 entry_points = {}\
+commons = {}\
 tracked_registers = {\
    A={name=\"A\",push=\"PHA\",pull=\"PLA\"},\
    X={name=\"X\",push=\"PHX\",pull=\"PLX\"},\
@@ -413,7 +414,7 @@ program_global_flags = {}\
 slot_aliases = {}\
 groups = {}\
 memory_regions = {}\
-local current_routine\
+local current_routine, current_common\
 local stop_parsing_file\
 local add_lines_from\
 \
@@ -663,6 +664,10 @@ function directives.routine(params)\
       eat_error(\"previous #routine did not #endroutine yet\")\
       stop_parsing_file = true\
       return\
+   elseif current_common ~= nil then\
+      eat_error(\"previous #common did not #endcommon yet\")\
+      stop_parsing_file = true\
+      return\
    elseif #params < 1 then\
       eat_error(\"#routine requires at least one parameter\")\
       stop_parsing_file = true\
@@ -848,7 +853,9 @@ directives[\"return\"] = function(params)\
       = {type=\"return\",n=current_line,interrupt=params[1] == \"INTERRUPT\"}\
 end\
 directives.endroutine = function(params)\
-   if #params ~= 0 and (#params ~= 1 or params[1] ~= \"NORETURN\") then\
+   if not current_routine then\
+      eat_error(\"`#endroutine` without `#routine`\")\
+   elseif #params ~= 0 and (#params ~= 1 or params[1] ~= \"NORETURN\") then\
       eat_error(\"`#endroutine` and `#endroutine NORETURN` are the only valid #endroutine directives\")\
    end\
    if not current_routine.has_begun then\
@@ -858,6 +865,31 @@ directives.endroutine = function(params)\
       eat_error(\"#routine %s lacks a #return directive, and its #endroutine lacks a `NORETURN` tag\", current_routine.name)\
    end\
    current_routine = nil\
+end\
+function directives.common(params)\
+   if current_routine ~= nil then\
+      eat_error(\"previous #routine did not #endroutine yet\")\
+      stop_parsing_file = true\
+      return\
+   elseif current_common ~= nil then\
+      eat_error(\"previous #common did not #endcommon yet\")\
+      stop_parsing_file = true\
+      return\
+   elseif #params ~= 0 then\
+      eat_error(\"#common does not take parameters\")\
+      stop_parsing_file = true\
+      return\
+   end\
+   current_common = {file=current_file, start_line=current_line, lines={}}\
+   commons[#commons+1] = current_common\
+end\
+directives.endcommon = function(params)\
+   if not current_common then\
+      eat_error(\"`#endcommon` without `#common`\")\
+   elseif #params ~= 0 then\
+      eat_error(\"`#endcommon` does not take parameters\")\
+   end\
+   current_common = nil\
 end\
 function add_lines_from(f)\
    for l in f:lines() do\
@@ -874,6 +906,9 @@ function add_lines_from(f)\
       elseif current_routine then\
          current_routine.lines[#current_routine.lines+1]\
             = {type=\"line\",n=current_line,l=lpeg.match(aliaser,l)}\
+      elseif current_common then\
+         current_common.lines[#current_common.lines+1]\
+            = lpeg.match(aliaser, l)\
       elseif not lpeg.match(blank_line_tester, l) then\
          eat_error(\"stray nonblank line\")\
       end\
@@ -920,8 +955,8 @@ function do_eat_pass()\
    current_file, current_line = nil, nil\
 end\
 ","@src/eat_pass.lua")()
-load("globals(\"do_memorymap_pass\")\
-function do_memorymap_pass()\
+load("globals(\"do_common_pass\")\
+function do_common_pass()\
    if bs == nil then\
       compiler_error(nil, nil, \"no #bs directive found\")\
       return\
@@ -952,18 +987,18 @@ function do_memorymap_pass()\
       end\
    end\
    if num_errors == 0 then\
-      -- generate output/memorymap\
-      make_directories_leading_up_to(outdir..DIRSEP..\"memorymap\")\
-      local f = assert(io.open(outdir..DIRSEP..\"memorymap\", \"w\"))\
+      -- generate output/common\
+      make_directories_leading_up_to(outdir..DIRSEP..\"common\")\
+      local f = assert(io.open(outdir..DIRSEP..\"common\", \"w\"))\
       local banksize = 32768 >> bs\
-      f:write(\".MEMORYMAP\\nDEFAULTSLOT 0\\n\")\
+      f:write(\"; Memory map\\n.MEMORYMAP\\nDEFAULTSLOT 0\\n\")\
       for slot=0,(1<<bs)-1 do\
          f:write((\"SLOT %i $%04X $%04X\\n\"):format(slot,\
                                                   32768+banksize*slot,\
                                                   banksize))\
       end\
       f:write(\".ENDME\\n.ROMBANKSIZE \",(\"$%04X\"):format(banksize),\
-              \"\\n.ROMBANKS \",bankcount,\"\\n\")\
+              \"\\n.ROMBANKS \",bankcount,\"\\n; Group assignments\\n\");\
       local t = {}\
       for name, group in pairs(groups) do\
          t[#t+1] = \".DEFINE hubris_Group_\"..name..\"_bank \"..group.bank..\"\\n\"\
@@ -974,11 +1009,30 @@ function do_memorymap_pass()\
       end\
       table.sort(t)\
       for n=1,#t do f:write(t[n]) end\
-      f:close()\
       table.sort(memory_regions, function(a,b) return a.start < b.start end)\
+      table.sort(commons, function(a,b)\
+                    if a.file < b.file then\
+                       return true\
+                    elseif a.file > b.file then\
+                       return false\
+                    else\
+                       return a.start_line < b.start_line\
+                    end\
+      end)\
+      for i,v in ipairs(commons) do\
+         if #v.lines == 0 then\
+            print(v.file..\":\"..v.start_line..\": WARNING: `#common` section is empty\")\
+         else\
+            f:write(\"; \",v.file,\" common section on line \",v.start_line,\"\\n\")\
+            for _,l in ipairs(v.lines) do\
+               f:write(l,\"\\n\");\
+            end\
+         end\
+      end\
+      f:close()\
    end\
 end\
-","@src/memorymap_pass.lua")()
+","@src/common_pass.lua")()
 load("local lpeg = require \"lpeg\"\
 \
 globals(\"do_connect_pass\", \"total_number_of_scopes\")\
@@ -1633,15 +1687,7 @@ function do_generate_pass()\
       local outpath = outdir .. DIRSEP .. \"hubris_\" .. name:gsub(\":\",\"-\") .. \".65c\"\
       make_directories_leading_up_to(outpath)\
       local f = assert(io.open(outpath, \"wb\"))\
-      f:write(\".INCLUDE \\\"\",outdir,DIRSEP,[[memorymap\"\
-.MACRO WAI\
-.DB $CB\
-.ENDM\
-.MACRO STP\
-.DB $DB\
-.ENDM\
-]])\
-      f:write(\".BANK \",routine.bank,\" SLOT \",routine.slot,\"\\n\")\
+      f:write(\".INCLUDE \\\"\",outdir,DIRSEP,\"common\\\"\\n\\n.BANK \",routine.bank,\" SLOT \",routine.slot,\"\\n\")\
       if routine.orga then\
          f:write(\".ORGA \",routine.orga,\"\\n.SECTION \\\"hubris_\",\
                  name, \"\\\" FORCE\\n\")\
@@ -1835,8 +1881,8 @@ do_eat_pass()\
 print_memory_usage(\"eat\")\
 maybe_error_exit()\
 \
-do_memorymap_pass()\
-print_memory_usage(\"memorymap\")\
+do_common_pass()\
+print_memory_usage(\"common\")\
 maybe_error_exit()\
 \
 do_connect_pass()\
