@@ -25,6 +25,7 @@ program_global_flags = {}
 slot_aliases = {}
 groups = {}
 memory_regions = {}
+local global_aliases = {}
 local current_routine, current_common
 local stop_parsing_file
 local add_lines_from
@@ -115,6 +116,17 @@ function directives.alias(params)
       eat_error("duplicate #alias definition for %q", params[1])
    else
       current_aliases[params[1]] = params[2]
+   end
+end
+function directives.globalalias(params)
+   if #params ~= 2 then
+      eat_error("#globalalias requires two parameters")
+      return
+   end
+   if global_aliases[params[1]] then
+      eat_error("duplicate #globalalias definition for %q", params[1])
+   else
+      global_aliases[params[1]] = params[2]
    end
 end
 function directives.unalias(params)
@@ -564,4 +576,20 @@ function do_eat_pass()
       recursively_eat_directory(indirs[n])
    end
    current_file, current_line = nil, nil
+   current_aliases = global_aliases
+   if num_errors == 0 then
+      for k,v in pairs(routines) do
+         for n=1,#v.lines do
+            if v.lines[n].type == "line" then
+               v.lines[n].l = lpeg.match(aliaser, v.lines[n].l)
+            end
+         end
+      end
+      for i,v in ipairs(commons) do
+         for n=1,#v.lines do
+            v.lines[n] = lpeg.match(aliaser, v.lines[n])
+         end
+      end
+   end
+   current_aliases = nil
 end
