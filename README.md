@@ -335,10 +335,12 @@ Corresponds to the `SMBx`/`RMBx` instructions. Atomically sets (`#setflag`) or c
 
 ## Aliases
 
-    #alias <aliasname> <realname>
-    #globalalias <aliasname> <realname>
+    #alias <aliasname> <contents>
+    #globalalias <aliasname> <contents>
 
-Anywhere in assembly source code `<aliasname>` is found, `<realname>` is processed instead. `<realname>` will be processed as if it had been written instead of `<aliasname>` at that point in the source, including possibly being handled as an alias. (Hubris makes no attempt to detect alias loops; processing such a loop will hang the compiler.)
+Anywhere in assembly source code `<aliasname>` is found, `<contents>` is processed instead. `<contents>` will be processed as if it had been written instead of `<aliasname>` at that point in the source, including possibly being handled as an alias. (Hubris makes no attempt to detect alias loops; processing such a loop will hang the compiler.)
+
+Aliases may be used to provide synonyms for variables, enabling some rudimentary polymorphism. They may also be used to create constants.
 
 Unlike every other part of Hubris, `#alias` have source file scope. An `#alias` is effective only on lines after it is defined, and then only until a corresponding `#unalias`. `#globalalias`, on the other hand, is global and cross-file in scope, including lines before the `#globalias` directive.
 
