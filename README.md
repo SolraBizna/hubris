@@ -62,7 +62,7 @@ Hubris does not assign any special meaning to any particular entry point name. Y
 Hubris source files use `;` as a comment character, just like regular 65C02 assembly files. Each non-blank line is either:
 
 - A Hubris directive, beginning with `#` (optionally preceded by whitespace)
-- A line of 65C02 assembly, or WLA-DX directive (only allowed within a `#routine`)
+- A line of 65C02 assembly, or WLA-DX directive (only allowed within a `#routine` or `#common`)
 
 By convention, most Hubris directives are unindented, Hubris directives that "are code" (e.g. `#call` and `#return`) are indented to the same level as the surrounding 65C02 code (with a single tab).
 
