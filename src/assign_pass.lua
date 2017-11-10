@@ -207,10 +207,14 @@ function do_assign_pass()
                assign[n].name = assign[n].name .. " (" .. table.concat(assign[n].flat, ", ") .. ")"
                assign[n].flat = nil
             end
-            if assign[n].routine then
-               assign[n].name = assign[n].routine.name .. "::" .. assign[n].name
+            if not assign[n].qualified_name then
+               if assign[n].routine then
+                  assign[n].qualified_name = assign[n].routine.name .. "::" .. assign[n].name
+               else
+                  assign[n].qualified_name = assign[n].name
+               end
             end
-            subt[#subt+1] = assign[n].name
+            subt[#subt+1] = assign[n].qualified_name
          end
          table.sort(subt)
          t[#t+1] = ("$%04X %s"):format(addr, table.concat(subt,", "))
