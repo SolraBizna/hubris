@@ -141,6 +141,17 @@ local function recursively_set_bank_and_slot(routine)
                         "ENTRY routines in multibank cartridges must have a GROUP tag")
          routine.bank = "FAKE"
          routine.slot = routine
+      elseif next(groups) ~= nil then
+         local group = next(groups)
+         if next(groups, group) == nil then
+            routine.bank = groups[group].bank
+            routine.slot = groups[group].slot
+         else
+            compiler_error(routine.file, routine.line,
+                           "ENTRY routines in single-bank cartridges with more than one #group defined must have a GROUP tag")
+            routine.bank = "FAKE"
+            routine.slot = routine
+         end
       else
          routine.bank = 0
          routine.slot = 0
