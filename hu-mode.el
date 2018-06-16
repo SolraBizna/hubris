@@ -35,7 +35,7 @@
    '("^[[:space:]]*#\\sw+" . font-lock-warning-face)
    '("#" . font-lock-constant-face)
    '("\\<\\(?:\\$[0-9A-Fa-f]+\\|[0-9]+\\)\\>" . font-lock-constant-face)
-   '("\\<\\(?:A\\(?:DC\\|ND\\|SL\\)\\|B\\(?:C[CS]\\|EQ\\|IT\\|MI\\|NE\\|PL\\|R[AK]\\|V[CS]\\|B[RS][0-7]\\)\\|C\\(?:L[CDIV]\\|MP\\|P[XY]\\)\\|DE[ACXY]\\|EOR\\|IN[ACXY]\\|J\\(?:MP\\|SR\\)\\|L\\(?:D[AXY]\\|SR\\)\\|NOP\\|ORA\\|P\\(?:H[APXY]\\|L[APXY]\\)\\|R\\(?:O[LR]\\|T[IS]\\|MB[0-7]\\)\\|S\\(?:BC\\|E[CDI]\\|T[APXYZ]\\|MB[0-7]\\)\\|T\\(?:A[XY]\\|RB\\|S[BX]\\|X[YS]\\|YA\\)\\|WAI\\)\\(?:\\.[WB]\\)?\\>" . font-lock-keyword-face)
+   '("\\<\\(?:A\\(?:DC\\|ND\\|SL\\)\\|B\\(?:C[CS]\\|EQ\\|IT\\|MI\\|NE\\|PL\\|R[AK]\\|V[CS]\\|B[RS][0-7]\\)\\|C\\(?:L[CDIV]\\|MP\\|P[XY]\\)\\|DE[ACXY]\\|EOR\\|IN[ACXY]\\|J\\(?:MP\\|SR\\)\\|L\\(?:D[AXY]\\|SR\\)\\|NOP\\|ORA\\|P\\(?:H[APXY]\\|L[APXY]\\)\\|R\\(?:O[LR]\\|T[IS]\\|MB[0-7]\\)\\|S\\(?:BC\\|E[CDI]\\|T[APXYZ]\\|MB[0-7]\\)\\|T\\(?:A[XY]\\|RB\\|S[BX]\\|X[AYS]\\|YA\\)\\|WAI\\)\\(?:\\.[WB]\\)?\\>" . font-lock-keyword-face)
    '("\\(?:[[:space:]]\\|^\\)*\\.\\sw+" . font-lock-keyword-face)
    '("\\<\\(?:ANY\\|BYTE\\|CLOBBER\\|ENTRY\\|GROUP\\|INTER\\(?:RUPT\\)?\\|JUMP\\|ORGA\\|P\\(?:ERSIST\\|RESERVE\\|TR\\)\\|WORD\\|[AXY]\\)\\>" . font-lock-keyword-face)
    '("^[^[:space:]#]+:" . font-lock-function-name-face)
