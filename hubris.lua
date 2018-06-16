@@ -1205,8 +1205,8 @@ local function recursively_set_bank_and_slot(routine)\
          routine.bank = \"FAKE\"\
          routine.slot = routine\
       elseif next(groups) ~= nil then\
-         if next(groups, next(groups)) == nil then\
-            local group = next(groups)\
+         local group = next(groups)\
+         if next(groups, group) == nil then\
             routine.bank = groups[group].bank\
             routine.slot = groups[group].slot\
          else\
