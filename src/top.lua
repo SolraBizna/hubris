@@ -68,7 +68,7 @@ while n <= #arg do
          elseif opt == "r" then
             should_print_region_utilization = true
          else
-            io.stderr:write("Unknown option: "..opt)
+            io.stderr:write("Unknown option: ",opt,"\n")
             cmdline_bad = true
          end
       end
