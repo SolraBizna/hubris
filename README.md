@@ -27,7 +27,7 @@ Hubris currently requires a recent build of WLA-DX, more recent than the officia
 
 When you run the Hubris compiler, you provide it one or more source directories. The Hubris compiler recursively searches these directories and processes all `.65c` and `.hu` files it finds. `.hu` files are Hubris-language source files, and are fully processed. `.65c` files are raw 65C02 source files, and are passed on to the assembler with no further processing. (`.65c` files contain startup code, certain kinds of glue, and pure data.)
 
-There is no file dependency or order dependency in `.hu` files. `#routine`s must each be fully contained inside one file, but other than that, the final compiled code is the same as if all `.hu` files are concatentated together before compiling.
+There is no file dependency or order dependency in `.hu` files. `#routine`s must each be fully contained inside one file, but other than that, the final compiled code is the same as if all `.hu` files are concatentated together before compiling (except in the case of `#alias`).
 
 Hubris puts all its intermediate files, and `.o` files, into the output directory provided. By convention, this directory is named `obj`. In addition to the generated `.65c` and `.o` files, Hubris will place two important files in this directory:
 
@@ -37,12 +37,9 @@ Hubris puts all its intermediate files, and `.o` files, into the output director
 An example compile process:
 
     $ hubris.lua obj src
-    $ echo >> obj/link
-    $ echo [header] >> obj/link
-    $ echo src/header.bin >> obj/link
-    $ wlalink -S -v obj/link bin/MyGame.etars
+    $ wlalink -S -v obj/link MyGame.etars/main.rom
 
-(You should really put this into a {shell script, batch file} rather than doing this manually each time. Using a Makefile would be even better.)
+(You should really put this into a shell script or batch file rather than doing this manually each time. Using a Makefile would be even better.)
 
 `.hu` files mainly contain Routines. A Routine is a block of code, and has its own scope for local variables and parameters. Recursion, directly or indirectly, is normally not allowed; that is, a Routine may not normally cause *itself* to be called again before the first call returns, directly or indirectly. This lack of recursion is what makes Hubris's variable allocation system work.
 
@@ -190,7 +187,7 @@ This is the structure of a Routine. Between `#routine` and `#endroutine` is the 
 
 Routine names may not begin with `_`, but may otherwise be any valid identifier. A Routine name may also consist of arbitrarily many names separated by double colons (`::`), in which case this is a Subroutine. For example, `X::Y` is a subroutine of `X`. It has access to `#param` and `#sublocal` variables of `X`, and should only be called from `X` and other subroutines of `X`. Hubris exports a symbol whose name is the exact routine name, including any colons.
 
-Every line within a `#routine` that is not a Hubris directive is passed to the assembler. They can contain instructions, labels, even WLA-DX directives. (Some WLA-DX directives, such as `.SECTION`/`.ENDS`, are inadvisable within a `#routine`.) Any labels defined within a `#routine` *should* begin with an underscore or be a +/- label, but if it doesn't, Hubris assumes you know what you're doing.
+Every line within a `#routine` that is not a Hubris directive is passed to the assembler. They can contain instructions, labels, even WLA-DX directives. (Some WLA-DX directives, such as `.SECTION`/`.ENDS`, are inadvisable within a `#routine`.) Any labels defined within a `#routine` *should* begin with an `@` or be a +/- label, but if it doesn't, Hubris assumes you know what you're doing.
 
 There may be more than one `#return`, in case the routine has multiple termination points. There may even be no `#return`, in case the routine is a deliberate infinite loop or otherwise never terminates, in which event `#endroutine` must be replaced with `#endroutine NORETURN` to indicate that this is intended.
 
@@ -199,7 +196,7 @@ Extra parameters to `#routine`:
 - `ENTRY`  
   Marks this routine as an Entry Point. (Generally there will be very few of these in a program.)
 - `CLOBBER <regs>`/`PRESERVE <regs>`
-  `<regs>` is a list of registers, containing any of `A`, `X`, `Y`. `CLOBBER` indicates that this routine intentionally clobbers these registers. `PRESERVE` indicates that this routine should push these registers on entry and pop them on `#return` or `#call ... JUMP`. (Hubris then adds the necessary pushes and pops automatically.) If a register is not listed as either `CLOBBER` or `PRESERVE`, it is **assumed** that this routine **does not alter** the register, either because it doesn't use it or because it has its own internal preservation logic.
+  `<regs>` is a list of registers, containing any of `A`, `X`, `Y`. `CLOBBER` indicates that this routine **intentionally clobbers** these registers. `PRESERVE` asks Hubris to push these registers on entry and pop them on `#return` or `#call ... JUMP`, marking them as callee-save registers. If a register is not listed as either `CLOBBER` or `PRESERVE`, it is **assumed** that this routine **does not alter** the register, either because it doesn't use it or because it has its own internal preservation logic. The caller can mark their `#call` with `PRESERVE` to indicate that they expect certain registers to be preserved, and Hubris will add pushes around the call only if required.
 - `ORGA <value>`  
   Forces this routine to start at the given CPU address. (This applies to the first line of the routine, not necessarily to its `#begin`!) WLA will complain if the address is outside the relevant slot.
 - `GROUP <name>`  
@@ -216,12 +213,12 @@ Extra parameters to `#call`:
 - `CLOBBER <regs>`/`PRESERVE <regs>`
   `<regs>` is a list of registers, containing any of `A`, `X`, `Y`. `CLOBBER` indicates that you don't care if the listed registers are clobbered, which is also the default state. `PRESERVE` indicates that you want the listed registers to be preserved. (Hubris will automatically add pushes and pops to ensure this, if and *only* if it is necessary.)
 - `JUMP`  
-  Use `JMP` instead of `JSR` to call this routine. Saves a few cycles for explicit tail returns, and is the only condoned way of doing recursion. (`CLOBBER` and `PRESERVE` are meaningless and ignored with a `JUMP` call; registers are restored according to the calling routine's `PRESERVE` tags instead. This can cause problems if the routine being `JUMP`ed to has more destructive `CLOBBERS` than this routine.)
+  Use `JMP` instead of `JSR` to call this routine. Registers `PRESERVE` marked preserve in this routine (not in this `#call`) will be popped, as if this were a return. Saves a few cycles for explicit tail returns, and is the only condoned way of doing recursion. (`CLOBBER` and `PRESERVE` are meaningless and ignored with a `JUMP` call; registers are restored according to the calling routine's `PRESERVE` tags instead. This can cause problems if the routine being `JUMP`ed to has more destructive `CLOBBERS` than this routine. A future version of Hubris will raise an error if this happens.)
 - `INTER`  
   This `#call` is intended for a different group. This tag *must* be present on calls across group boundaries, and *must not* be present on calls within the same group. Intergroup calls may incur a Longcall, see below.  
   Longcalls will clobber the accumulator; with the `-i` option, the compiler will clobber the accumulator on *all* `INTER` calls, even non-long ones; this helps head off accumulator-related accidents when groups are shuffled around.
 - `UNSAFE`  
-  Don't use this! This ignores the call for recursion checking, cross-subprogram call prevention, and variable allocation! This allows you to bypass all of Hubris's safety checks! Before you do something like this, consider not doing the unsafe thing in the first place!
+  Don't use this! This ignores the call for purposes of recursion checking, cross-subprogram call prevention, and variable allocation! This allows you to bypass all of Hubris's safety checks! This is a very naughty tag that you should only use if you know what you're doing! Before you do something like this, consider not doing the unsafe thing in the first place!
 
 If you have a routine named `foo` and a parameter named `p_Bar`, you can access it within any routine that directly calls `foo` by writing `foo::p_Bar`. You should write any parameters immediately before the call, and read any return values immediately afterward.
 
@@ -348,7 +345,7 @@ Aliases are only processed in assembly source, such as in `#routine`s and `#comm
 
     #unalias <aliasname>
 
-Forgets a previously-defined alias.
+Forgets a previously-defined alias. There is no equivalent directive for global aliases.
 
 ## Exports
 
