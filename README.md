@@ -339,7 +339,7 @@ Anywhere in assembly source code `<aliasname>` is found, `<contents>` is process
 
 Aliases may be used to provide synonyms for variables, enabling some rudimentary polymorphism. They may also be used to create constants.
 
-Unlike every other part of Hubris, `#alias` have source file scope. An `#alias` is effective only on lines after it is defined, and then only until a corresponding `#unalias`. `#globalalias`, on the other hand, is global and cross-file in scope, including lines before the `#globalias` directive.
+Unlike every other part of Hubris, `#alias` directives have source file scope. An `#alias` is effective only on lines after it is defined, and then only until a corresponding `#unalias`. `#globalalias`, on the other hand, is global and cross-file in scope, including lines before the `#globalalias` directive.
 
 Aliases are only processed in assembly source, such as in `#routine`s and `#common`s. Aliases do not take effect in Hubris directives. `#globalalias` processing is performed after all `#alias` processing.
 
